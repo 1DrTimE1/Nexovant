@@ -18,6 +18,13 @@ public partial class App : Application
             return;
         }
 
+        DispatcherUnhandledException += (_, args) =>
+        {
+            // Show unexpected errors instead of letting the app vanish without a word.
+            args.Handled = true;
+            Dialog.Show(MainWindow, DialogKind.Error, "Något gick fel", "Nexovant stötte på ett oväntat fel. Inga filer har tagits bort på grund av felet.", args.Exception.Message);
+        };
+
         new MainWindow().Show();
     }
 

@@ -17,8 +17,8 @@ public sealed class CategoryItem : INotifyPropertyChanged
         Category = category;
         IsAvailable = !category.RequiresAdmin || isAdmin;
         isSelected = category.DefaultSelected && IsAvailable;
-        sizeText = IsAvailable ? "–" : "Kräver admin";
-        detailText = IsAvailable ? "Ej skannad" : "Starta som administratör";
+        sizeText = "–";
+        detailText = IsAvailable ? "Ej skannad" : "Kräver administratör";
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -28,6 +28,21 @@ public sealed class CategoryItem : INotifyPropertyChanged
     public string Name => Category.Name;
     public string Description => Category.Description;
     public string? Warning => Category.Warning;
+
+    /// <summary>Segoe Fluent Icons glyph shown next to the category.</summary>
+    public string Glyph => Category.Id switch
+    {
+        "user-temp" => "",       // folder
+        "windows-temp" => "",    // system
+        "browser-cache" => "",   // globe
+        "app-cache" => "",       // all apps
+        "shader-cache" => "",    // game
+        "crash-reports" => "",   // bug
+        "windows-update" => "",  // sync
+        "dev-cache" => "",       // code
+        "recycle-bin" => "",     // delete
+        _ => "",                 // document
+    };
     public Visibility WarningVisibility => string.IsNullOrEmpty(Warning) ? Visibility.Collapsed : Visibility.Visible;
     public bool IsAvailable { get; }
     public double CardOpacity => IsAvailable ? 1.0 : 0.55;

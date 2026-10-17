@@ -22,15 +22,14 @@ public sealed class DetailsWindow : Window
     public DetailsWindow(CategoryScanResult result)
     {
         this.result = result;
+        WindowTheme.Apply(this);
         Title = $"Välj filer – {result.Category.Name}";
-        Width = 1000;
-        Height = 680;
-        MinWidth = 640;
-        MinHeight = 400;
+        Width = 1040;
+        Height = 700;
+        MinWidth = 700;
+        MinHeight = 420;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Background = Res<Brush>("BgBrush");
-        FontFamily = new FontFamily("Segoe UI");
-        FontSize = 13;
+        ShowInTaskbar = false;
 
         var files = result.Files.OrderByDescending(f => f.Size).ToList();
         view = CollectionViewSource.GetDefaultView(files);
@@ -45,29 +44,36 @@ public sealed class DetailsWindow : Window
         };
         var hint = new TextBlock
         {
-            Text = "Bocka i de filer du vill ta bort. Avbockade filer lämnas kvar. Tips: markera rader och tryck Mellanslag för att växla.",
+            Text = "Bocka i de filer du vill ta bort. Avbockade filer lämnas kvar. Tips: markera flera rader och tryck Mellanslag för att växla, eller dubbelklicka för att visa filen i Utforskaren.",
             Foreground = Res<Brush>("MutedBrush"),
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 4, 0, 12),
+            Margin = new Thickness(0, 4, 0, 14),
         };
 
         // Toolbar: search + select all / none for the visible rows.
-        search = new TextBox { Padding = new Thickness(8, 6, 8, 6), VerticalContentAlignment = VerticalAlignment.Center, MinWidth = 260 };
+        search = new TextBox { Tag = "Sök efter fil eller mapp…", MinWidth = 280, Height = 38, VerticalAlignment = VerticalAlignment.Center };
         search.TextChanged += (_, _) => view.Refresh();
-        var searchLabel = new TextBlock { Text = "Sök:", Foreground = Res<Brush>("TextBrush"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
-        var selectAll = Button("Markera alla", (_, _) => SetVisible(true));
-        var selectNone = Button("Avmarkera alla", (_, _) => SetVisible(false));
-        var openFolder = Button("Öppna i Utforskaren", (_, _) => OpenInExplorer());
+        var searchIcon = new TextBlock
+        {
+            Text = "",
+            FontFamily = Res<FontFamily>("IconFont"),
+            Foreground = Res<Brush>("MutedBrush"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0),
+        };
+        var selectAll = Button("", "Markera alla", (_, _) => SetVisible(true));
+        var selectNone = Button("", "Avmarkera alla", (_, _) => SetVisible(false));
+        var openFolder = Button("", "Visa i Utforskaren", (_, _) => OpenInExplorer());
 
-        var toolbar = new DockPanel { Margin = new Thickness(0, 0, 0, 10), LastChildFill = true };
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal };
+        var toolbar = new DockPanel { Margin = new Thickness(0, 0, 0, 12), LastChildFill = true };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         buttons.Children.Add(selectAll);
         buttons.Children.Add(selectNone);
         buttons.Children.Add(openFolder);
         DockPanel.SetDock(buttons, Dock.Right);
-        DockPanel.SetDock(searchLabel, Dock.Left);
+        DockPanel.SetDock(searchIcon, Dock.Left);
         toolbar.Children.Add(buttons);
-        toolbar.Children.Add(searchLabel);
+        toolbar.Children.Add(searchIcon);
         toolbar.Children.Add(search);
 
         grid = new DataGrid
@@ -79,27 +85,34 @@ public sealed class DetailsWindow : Window
             HeadersVisibility = DataGridHeadersVisibility.Column,
             GridLinesVisibility = DataGridGridLinesVisibility.None,
             SelectionMode = DataGridSelectionMode.Extended,
-            RowHeight = 26,
+            RowHeight = 34,
             EnableRowVirtualization = true,
         };
         VirtualizingPanel.SetIsVirtualizing(grid, true);
         VirtualizingPanel.SetVirtualizationMode(grid, VirtualizationMode.Recycling);
         grid.Columns.Add(CheckBoxColumn());
-        grid.Columns.Add(new DataGridTextColumn { Header = "Storlek", Binding = new Binding(nameof(FoundFile.SizeText)), SortMemberPath = nameof(FoundFile.Size), Width = 90 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "Namn", Binding = new Binding(nameof(FoundFile.Name)), Width = 220 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "Ändrad", Binding = new Binding(nameof(FoundFile.LastWrite)) { StringFormat = "yyyy-MM-dd HH:mm" }, Width = 130 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "Mapp", Binding = new Binding(nameof(FoundFile.Folder)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        grid.Columns.Add(TextColumn("Storlek", nameof(FoundFile.SizeText), 100, sortBy: nameof(FoundFile.Size), alignRight: true));
+        grid.Columns.Add(TextColumn("Namn", nameof(FoundFile.Name), 240));
+        grid.Columns.Add(TextColumn("Ändrad", nameof(FoundFile.LastWrite), 140, format: "yyyy-MM-dd HH:mm"));
+        grid.Columns.Add(TextColumn("Mapp", nameof(FoundFile.Folder), new DataGridLength(1, DataGridLengthUnitType.Star)));
         grid.PreviewKeyDown += Grid_PreviewKeyDown;
-        grid.MouseDoubleClick += (_, _) => OpenInExplorer();
+        grid.MouseDoubleClick += (_, e) =>
+        {
+            // Only a double-click on a row, not on a column header or the scrollbar.
+            if (e.OriginalSource is DependencyObject source && FindParent<DataGridRow>(source) is not null)
+                OpenInExplorer();
+        };
 
         summary = new TextBlock { Foreground = Res<Brush>("TextBrush"), VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold };
-        var done = Button("Klar", (_, _) => Close(), primary: true);
-        var footer = new DockPanel { Margin = new Thickness(0, 12, 0, 0) };
+        var done = Button("", "Klar", (_, _) => Close(), primary: true);
+        done.IsDefault = true;
+        var footerContent = new DockPanel();
         DockPanel.SetDock(done, Dock.Right);
-        footer.Children.Add(done);
-        footer.Children.Add(summary);
+        footerContent.Children.Add(done);
+        footerContent.Children.Add(summary);
+        var footer = new Border { Style = Res<Style>("Card"), Margin = new Thickness(0, 14, 0, 0), Padding = new Thickness(18, 12, 18, 12), Child = footerContent };
 
-        var root = new DockPanel { Margin = new Thickness(20) };
+        var root = new DockPanel { Margin = new Thickness(24, 20, 24, 20) };
         foreach (var top in new UIElement[] { heading, hint, toolbar })
         {
             DockPanel.SetDock(top, Dock.Top);
@@ -134,16 +147,47 @@ public sealed class DetailsWindow : Window
 
     static T Res<T>(string key) => (T)Application.Current.Resources[key];
 
-    static Button Button(string text, RoutedEventHandler onClick, bool primary = false)
+    static Button Button(string glyph, string text, RoutedEventHandler onClick, bool primary = false)
     {
+        var content = new StackPanel { Orientation = Orientation.Horizontal };
+        content.Children.Add(new TextBlock { Text = glyph, FontFamily = Res<FontFamily>("IconFont"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
+        content.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
         var b = new Button
         {
-            Content = text,
+            Content = content,
             Style = Res<Style>(primary ? "PrimaryButton" : "SecondaryButton"),
-            Padding = new Thickness(14, 7, 14, 7),
+            Padding = new Thickness(14, 8, 14, 8),
         };
+        System.Windows.Automation.AutomationProperties.SetName(b, text); // the content is an icon + text panel
         b.Click += onClick;
         return b;
+    }
+
+    static DataGridTextColumn TextColumn(string header, string path, DataGridLength width, string? sortBy = null, string? format = null, bool alignRight = false)
+    {
+        // Long names and paths are cut with "…" and shown in full as a tooltip.
+        var style = new Style(typeof(TextBlock));
+        style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
+        style.Setters.Add(new Setter(FrameworkElement.ToolTipProperty, new Binding(path) { StringFormat = format }));
+        if (alignRight) style.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
+        return new DataGridTextColumn
+        {
+            Header = header,
+            Binding = new Binding(path) { StringFormat = format },
+            SortMemberPath = sortBy ?? path,
+            Width = width,
+            ElementStyle = style,
+        };
+    }
+
+    static T? FindParent<T>(DependencyObject child) where T : DependencyObject
+    {
+        for (var current = child; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is T match) return match;
+            if (current is not Visual) return null; // e.g. a Run inside a TextBlock
+        }
+        return null;
     }
 
     static DataGridTemplateColumn CheckBoxColumn()
@@ -161,7 +205,7 @@ public sealed class DetailsWindow : Window
             Header = "Ta bort",
             CellTemplate = new DataTemplate { VisualTree = box },
             SortMemberPath = nameof(FoundFile.IsSelected),
-            Width = 70,
+            Width = 84,
         };
     }
 
@@ -193,6 +237,6 @@ public sealed class DetailsWindow : Window
     {
         var count = result.Files.Count(f => f.IsSelected);
         var bytes = result.Files.Where(f => f.IsSelected).Sum(f => f.Size);
-        summary.Text = $"Valt att ta bort: {count:N0} av {result.Files.Count:N0} filer  ·  {Format.Bytes(bytes)}";
+        summary.Text = $"Valt att ta bort:  {count:N0} av {result.Files.Count:N0} filer  ·  {Format.Bytes(bytes)}";
     }
 }
