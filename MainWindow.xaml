@@ -1,0 +1,114 @@
+<Window x:Class="Nexovant.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Nexovant – Säker diskrensning"
+        Width="940" Height="720" MinWidth="740" MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BgBrush}"
+        FontFamily="Segoe UI" FontSize="13">
+    <Grid Margin="28,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <!-- Header -->
+            <Grid Margin="0,0,0,22">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Nexovant" FontSize="32" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                        <TextBlock x:Name="VersionText" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Bottom" Margin="10,0,0,7"/>
+                    </StackPanel>
+                    <TextBlock Text="Hittar filer som är helt säkra att ta bort och frigör utrymme på din dator."
+                               Foreground="{StaticResource MutedBrush}" Margin="0,2,0,0"/>
+                </StackPanel>
+                <Border Grid.Column="1" Style="{StaticResource Card}" MinWidth="280" VerticalAlignment="Center">
+                    <StackPanel>
+                        <TextBlock x:Name="DiskText" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold"/>
+                        <ProgressBar x:Name="DiskBar" Height="6" Margin="0,10,0,0" Maximum="100"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Update banner, shown when GitHub has a newer release -->
+            <Border x:Name="UpdateBanner" Style="{StaticResource Card}" BorderBrush="{StaticResource AccentBrush}"
+                    Margin="0,0,0,16" Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="UpdateText" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        <ProgressBar x:Name="UpdateBar" Height="4" Margin="0,8,0,0" Maximum="1" Visibility="Collapsed"/>
+                    </StackPanel>
+                    <Button x:Name="UpdateButton" Grid.Column="1" Content="Uppdatera nu" Style="{StaticResource PrimaryButton}"
+                            Padding="16,8" Click="UpdateButton_Click"/>
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- Categories -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,6,0">
+            <ItemsControl x:Name="CategoryList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10" Opacity="{Binding CardOpacity}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding IsAvailable}"
+                                          VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <CheckBox.LayoutTransform>
+                                        <ScaleTransform ScaleX="1.3" ScaleY="1.3"/>
+                                    </CheckBox.LayoutTransform>
+                                </CheckBox>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                                    <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0"/>
+                                    <TextBlock Text="{Binding Warning}" Visibility="{Binding WarningVisibility}" TextWrapping="Wrap"
+                                               Foreground="{StaticResource WarnBrush}" FontSize="12" Margin="0,5,0,0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Width="190" Margin="18,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding SizeText}" FontSize="19" FontWeight="Bold" TextAlignment="Right"
+                                               Foreground="{StaticResource TextBrush}"/>
+                                    <TextBlock Text="{Binding DetailText}" TextAlignment="Right" TextWrapping="Wrap"
+                                               Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,2,0,0"/>
+                                    <Button Content="Välj filer…" Style="{StaticResource LinkButton}" FontSize="13" HorizontalAlignment="Right"
+                                            Margin="0,4,0,0" Tag="{Binding}" Visibility="{Binding DetailsVisibility}"
+                                            Click="ShowDetails_Click"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Grid Grid.Row="2" Margin="0,18,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                <TextBlock x:Name="StatusText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                <ProgressBar x:Name="WorkBar" Height="4" Margin="0,8,0,0" IsIndeterminate="True" Visibility="Collapsed"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button x:Name="AdminButton" Content="Starta som administratör" Style="{StaticResource SecondaryButton}" Click="AdminButton_Click"/>
+                <Button x:Name="ScanButton" Content="Skanna" Style="{StaticResource SecondaryButton}" Click="ScanButton_Click"/>
+                <Button x:Name="CleanButton" Content="Rensa valda" Style="{StaticResource PrimaryButton}" Click="CleanButton_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
