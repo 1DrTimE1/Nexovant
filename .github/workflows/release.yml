@@ -13,6 +13,7 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -40,14 +41,19 @@ jobs:
       - name: Test install and uninstall
         shell: pwsh
         run: |
-          Start-Process out/NexovantSetup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait
+          # Wait only for the setup itself: -Wait would also wait for the Nexovant window the setup starts.
+          $setup = Start-Process out/NexovantSetup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru
+          if (-not $setup.WaitForExit(300000)) { throw "Setup timed out" }
+          Start-Sleep 3
           Get-Process Nexovant -ErrorAction SilentlyContinue | Stop-Process -Force
           $app = "$env:LOCALAPPDATA\Programs\Nexovant"
           if (-not (Test-Path "$app\Nexovant.exe")) { throw "Nexovant.exe was not installed" }
           if (-not (Test-Path "$app\unins000.exe")) { throw "Uninstaller missing" }
           if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Nexovant.lnk")) { throw "Start menu shortcut missing" }
-          Start-Process "$app\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES' -Wait
-          Start-Sleep 3
+          $uninstall = Start-Process "$app\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES' -PassThru
+          if (-not $uninstall.WaitForExit(300000)) { throw "Uninstall timed out" }
+          # The uninstaller hands over to a temporary copy of itself, so poll for the result.
+          for ($i = 0; $i -lt 30 -and (Test-Path "$app\Nexovant.exe"); $i++) { Start-Sleep 2 }
           if (Test-Path "$app\Nexovant.exe") { throw "Uninstall did not remove the app" }
 
       - uses: softprops/action-gh-release@v2
