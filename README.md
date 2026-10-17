@@ -10,7 +10,7 @@ dotnet build -c Release
 
 ## Släppa en ny version (autouppdatering)
 
-Appen kollar `https://api.github.com/repos/1DrTimE1/Nexovant/releases/latest` vid start. Om det finns en nyare version visas en knapp "Uppdatera nu".
+Appen kollar `https://api.github.com/repos/1drtime1/Nexovant/releases/latest` vid start. Om det finns en nyare version visas en knapp "Uppdatera nu".
 
 1. Committa dina ändringar.
 2. Skapa och pusha en versionstagg:

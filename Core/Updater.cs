@@ -16,7 +16,7 @@ public sealed record UpdateInfo(Version Version, string Tag, string ExeUrl, stri
 public static class Updater
 {
     /// <summary>GitHub repository in the form "owner/name". The repository must be public.</summary>
-    public const string Repository = "1DrTimE1/Nexovant";
+    public const string Repository = "1drtime1/Nexovant";
 
     const string ExeAsset = "Nexovant.exe";
     const string ChecksumAsset = "Nexovant.exe.sha256";
