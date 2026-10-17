@@ -42,7 +42,7 @@ public partial class MainWindow : Window
 
     async Task CheckForUpdateAsync()
     {
-        _ = Task.Run(Updater.CleanupOldVersion);
+        _ = Task.Run(Updater.CleanupDownloads);
         try
         {
             pendingUpdate = await Updater.CheckAsync();
@@ -55,7 +55,7 @@ public partial class MainWindow : Window
 
         UpdateText.Text = Updater.CanSelfUpdate
             ? $"En ny version av Nexovant finns: v{pendingUpdate.Version} (du har v{Updater.CurrentVersion})."
-            : $"En ny version finns: v{pendingUpdate.Version}. Den här utvecklarversionen uppdateras inte automatiskt.";
+            : $"En ny version finns: v{pendingUpdate.Version}. Installera den med NexovantSetup.exe från GitHub för automatiska uppdateringar.";
         UpdateButton.Visibility = Updater.CanSelfUpdate ? Visibility.Visible : Visibility.Collapsed;
         UpdateBanner.Visibility = Visibility.Visible;
     }

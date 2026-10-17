@@ -10,10 +10,12 @@
     <RootNamespace>Nexovant</RootNamespace>
     <Product>Nexovant</Product>
     <Version>1.0.0</Version>
+    <ApplicationIcon>Assets\Nexovant.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <Using Include="System.IO" />
+    <Resource Include="Assets\Nexovant.ico" />
   </ItemGroup>
 
 </Project>

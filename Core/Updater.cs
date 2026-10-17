@@ -7,10 +7,10 @@ using System.Text.Json;
 
 namespace Nexovant.Core;
 
-public sealed record UpdateInfo(Version Version, string Tag, string ExeUrl, string Sha256, string Notes);
+public sealed record UpdateInfo(Version Version, string Tag, string SetupUrl, string Sha256, string Notes);
 
 /// <summary>
-/// Auto-update through GitHub Releases. Each release must contain Nexovant.exe (built by
+/// Auto-update through GitHub Releases. Each release must contain NexovantSetup.exe (built by
 /// .github/workflows/release.yml). The download is verified against the SHA-256 digest GitHub reports for the file.
 /// </summary>
 public static class Updater
@@ -18,7 +18,7 @@ public static class Updater
     /// <summary>GitHub repository in the form "owner/name". The repository must be public.</summary>
     public const string Repository = "1drtime1/Nexovant";
 
-    const string ExeAsset = "Nexovant.exe";
+    const string SetupAsset = "NexovantSetup.exe";
 
     // Must be declared before Http, which uses it in its initializer.
     public static Version CurrentVersion { get; } =
@@ -48,7 +48,7 @@ public static class Updater
 
         foreach (var asset in release.GetProperty("assets").EnumerateArray())
         {
-            if (asset.GetProperty("name").GetString() != ExeAsset) continue;
+            if (asset.GetProperty("name").GetString() != SetupAsset) continue;
 
             // GitHub computes this itself when the file is uploaded, e.g. "sha256:4d7e…".
             var digest = asset.TryGetProperty("digest", out var d) ? d.GetString() : null;
@@ -62,26 +62,26 @@ public static class Updater
         return null;
     }
 
-    /// <summary>True when running as the published single-file exe (updates are not applied to dev builds).</summary>
-    public static bool CanSelfUpdate =>
-        Environment.ProcessPath is { } path
-        && string.Equals(Path.GetFileName(path), ExeAsset, StringComparison.OrdinalIgnoreCase)
-        && !File.Exists(Path.Combine(AppContext.BaseDirectory, "Nexovant.dll"));
+    /// <summary>True when this copy was installed by NexovantSetup.exe (dev builds are never auto-updated).</summary>
+    public static bool CanSelfUpdate => File.Exists(Path.Combine(AppContext.BaseDirectory, "unins000.exe"));
 
-    /// <summary>Downloads, verifies and installs the update, then starts the new version. The caller should exit afterwards.</summary>
+    static readonly string DownloadDir = Path.Combine(Path.GetTempPath(), "Nexovant-update");
+
+    /// <summary>
+    /// Downloads and verifies the new setup, then starts it silently. The setup closes this app, installs
+    /// the new version over it and starts it again. The caller should exit right after this returns.
+    /// </summary>
     public static async Task InstallAsync(UpdateInfo update, IProgress<double>? progress, CancellationToken ct = default)
     {
-        var current = Environment.ProcessPath ?? throw new InvalidOperationException("Hittar inte programfilen.");
-        var dir = Path.GetDirectoryName(current)!;
-        var download = Path.Combine(dir, ExeAsset + ".download");
-        var old = current + ".old";
+        Directory.CreateDirectory(DownloadDir);
+        var setup = Path.Combine(DownloadDir, $"NexovantSetup-{update.Version}.exe");
 
-        using (var response = await Http.GetAsync(update.ExeUrl, HttpCompletionOption.ResponseHeadersRead, ct))
+        using (var response = await Http.GetAsync(update.SetupUrl, HttpCompletionOption.ResponseHeadersRead, ct))
         {
             response.EnsureSuccessStatusCode();
             var total = response.Content.Headers.ContentLength ?? 0;
             await using var source = await response.Content.ReadAsStreamAsync(ct);
-            await using var target = File.Create(download);
+            await using var target = File.Create(setup);
             var buffer = new byte[81920];
             long read = 0;
             int n;
@@ -94,41 +94,27 @@ public static class Updater
         }
 
         string actual;
-        await using (var file = File.OpenRead(download))
+        await using (var file = File.OpenRead(setup))
             actual = Convert.ToHexStringLower(await SHA256.HashDataAsync(file, ct));
         if (actual != update.Sha256)
         {
-            File.Delete(download);
+            File.Delete(setup);
             throw new InvalidDataException("Den nedladdade filen var skadad (kontrollsumman stämmer inte). Uppdateringen avbröts.");
         }
 
-        // A running exe cannot be overwritten on Windows, but it can be renamed.
-        if (File.Exists(old)) File.Delete(old);
-        File.Move(current, old);
-        try
-        {
-            File.Move(download, current);
-        }
-        catch
-        {
-            File.Move(old, current); // roll back
-            throw;
-        }
-
-        Process.Start(new ProcessStartInfo(current) { UseShellExecute = true });
+        Process.Start(new ProcessStartInfo(setup, "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS") { UseShellExecute = true });
     }
 
-    /// <summary>Removes the previous version left behind by an update.</summary>
-    public static void CleanupOldVersion()
+    /// <summary>Removes setup files left over from earlier updates.</summary>
+    public static void CleanupDownloads()
     {
-        if (Environment.ProcessPath is not { } current) return;
-        foreach (var leftover in new[] { current + ".old", Path.Combine(Path.GetDirectoryName(current)!, ExeAsset + ".download") })
+        try
         {
-            for (int attempt = 0; attempt < 10 && File.Exists(leftover); attempt++)
-            {
-                try { File.Delete(leftover); }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Thread.Sleep(300); }
-            }
+            if (Directory.Exists(DownloadDir)) Directory.Delete(DownloadDir, recursive: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // still in use by a running setup, try again next start
         }
     }
 }
