@@ -7,11 +7,11 @@ using System.Text.Json;
 
 namespace Nexovant.Core;
 
-public sealed record UpdateInfo(Version Version, string Tag, string ExeUrl, string ChecksumUrl, string Notes);
+public sealed record UpdateInfo(Version Version, string Tag, string ExeUrl, string Sha256, string Notes);
 
 /// <summary>
-/// Auto-update through GitHub Releases. Each release must contain Nexovant.exe and Nexovant.exe.sha256
-/// (the release workflow in .github/workflows/release.yml creates both).
+/// Auto-update through GitHub Releases. Each release must contain Nexovant.exe (built by
+/// .github/workflows/release.yml). The download is verified against the SHA-256 digest GitHub reports for the file.
 /// </summary>
 public static class Updater
 {
@@ -19,7 +19,6 @@ public static class Updater
     public const string Repository = "1drtime1/Nexovant";
 
     const string ExeAsset = "Nexovant.exe";
-    const string ChecksumAsset = "Nexovant.exe.sha256";
 
     // Must be declared before Http, which uses it in its initializer.
     public static Version CurrentVersion { get; } =
@@ -47,18 +46,20 @@ public static class Updater
         if (!Version.TryParse(tag.TrimStart('v', 'V'), out var latest) || latest <= CurrentVersion)
             return null;
 
-        string? exeUrl = null, checksumUrl = null;
         foreach (var asset in release.GetProperty("assets").EnumerateArray())
         {
-            var name = asset.GetProperty("name").GetString();
-            var url = asset.GetProperty("browser_download_url").GetString();
-            if (name == ExeAsset) exeUrl = url;
-            else if (name == ChecksumAsset) checksumUrl = url;
-        }
-        if (exeUrl is null || checksumUrl is null) return null;
+            if (asset.GetProperty("name").GetString() != ExeAsset) continue;
 
-        var notes = release.TryGetProperty("body", out var body) ? body.GetString() ?? "" : "";
-        return new UpdateInfo(latest, tag, exeUrl, checksumUrl, notes);
+            // GitHub computes this itself when the file is uploaded, e.g. "sha256:4d7e…".
+            var digest = asset.TryGetProperty("digest", out var d) ? d.GetString() : null;
+            var url = asset.GetProperty("browser_download_url").GetString();
+            if (url is null || digest is null || !digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            var notes = release.TryGetProperty("body", out var body) ? body.GetString() ?? "" : "";
+            return new UpdateInfo(latest, tag, url, digest["sha256:".Length..].ToLowerInvariant(), notes);
+        }
+        return null;
     }
 
     /// <summary>True when running as the published single-file exe (updates are not applied to dev builds).</summary>
@@ -74,8 +75,6 @@ public static class Updater
         var dir = Path.GetDirectoryName(current)!;
         var download = Path.Combine(dir, ExeAsset + ".download");
         var old = current + ".old";
-
-        var expected = (await Http.GetStringAsync(update.ChecksumUrl, ct)).Trim().Split(' ', '\t')[0].ToLowerInvariant();
 
         using (var response = await Http.GetAsync(update.ExeUrl, HttpCompletionOption.ResponseHeadersRead, ct))
         {
@@ -97,7 +96,7 @@ public static class Updater
         string actual;
         await using (var file = File.OpenRead(download))
             actual = Convert.ToHexStringLower(await SHA256.HashDataAsync(file, ct));
-        if (actual != expected)
+        if (actual != update.Sha256)
         {
             File.Delete(download);
             throw new InvalidDataException("Den nedladdade filen var skadad (kontrollsumman stämmer inte). Uppdateringen avbröts.");

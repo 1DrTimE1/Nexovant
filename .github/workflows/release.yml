@@ -1,5 +1,5 @@
 # Builds Nexovant.exe and publishes a GitHub Release when a version tag (e.g. v1.0.1) is pushed.
-# The app's auto-updater downloads Nexovant.exe and checks it against Nexovant.exe.sha256.
+# The app's auto-updater downloads Nexovant.exe and checks it against the SHA-256 digest GitHub reports for it.
 name: Release
 
 on:
@@ -27,15 +27,7 @@ jobs:
             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:EnableCompressionInSingleFile=true -p:Version=$version -o out
 
-      - name: Checksum
-        shell: pwsh
-        run: |
-          $hash = (Get-FileHash out/Nexovant.exe -Algorithm SHA256).Hash.ToLower()
-          "$hash  Nexovant.exe" | Out-File out/Nexovant.exe.sha256 -Encoding ascii -NoNewline
-
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: |
-            out/Nexovant.exe
-            out/Nexovant.exe.sha256
+          files: out/Nexovant.exe
